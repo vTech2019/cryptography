@@ -1,37 +1,6 @@
 #include "BMI_C.h"
-#define GET_BIT_RIGHT_SHIFT(value, shift, bit) ((value >> shift) & bit)
-#define GET_BIT_LEFT_SHIFT(value, shift, bit) ((value << shift) & bit)
-#define BIT_REVERSE(value, bit) \
-	(((value >> (8 * sizeof(value) - 1 - bit)) & (1 << bit))\
- |  ((value << (8 * sizeof(value) - 1 - bit)) & (1 << (8 * sizeof(value) - bit - 1))))
-#define REVERSE_BIT_RIGHT_SHIFT2(result, value, max_shift, min_bit) (result |= GET_BIT_RIGHT_SHIFT(value, max_shift, min_bit)); \
-																													  (result |= GET_BIT_RIGHT_SHIFT(value, (max_shift - 2), (min_bit * 2)));
-#define REVERSE_BIT_LEFT_SHIFT2(result, value, max_shift, min_bit) (result |= GET_BIT_LEFT_SHIFT(value, max_shift, min_bit)); \
-																													  (result |= GET_BIT_LEFT_SHIFT(value, (max_shift + 2), (min_bit * 2)));
-#define REVERSE_BIT_RIGHT_SHIFT4(result, value, max_shift, min_bit) REVERSE_BIT_RIGHT_SHIFT2(result, value, max_shift, min_bit) \
-																													  REVERSE_BIT_RIGHT_SHIFT2(result, value, (max_shift - 4), (min_bit * 4))
-#define REVERSE_BIT_LEFT_SHIFT4(result, value, max_shift, min_bit) REVERSE_BIT_LEFT_SHIFT2(result, value, max_shift, min_bit) \
-																													  REVERSE_BIT_LEFT_SHIFT2(result, value, (max_shift + 4), (min_bit * 4))
-#define REVERSE_BIT_RIGHT_SHIFT8(result, value, max_shift, min_bit) REVERSE_BIT_RIGHT_SHIFT4(result, value, max_shift, min_bit) \
-																													  REVERSE_BIT_RIGHT_SHIFT4(result, value, (max_shift - 8), (min_bit * 8))
-#define REVERSE_BIT_LEFT_SHIFT8(result, value, max_shift, min_bit) REVERSE_BIT_LEFT_SHIFT4(result, value, max_shift, min_bit) \
-																													  REVERSE_BIT_LEFT_SHIFT4(result, value, (max_shift + 8), (min_bit * 8))
-#define REVERSE_BIT_RIGHT_SHIFT16(result, value, max_shift, min_bit) REVERSE_BIT_RIGHT_SHIFT8(result, value, max_shift, min_bit) \
-																													  REVERSE_BIT_RIGHT_SHIFT8(result, value, (max_shift - 16), (min_bit * 16))
-#define REVERSE_BIT_LEFT_SHIFT16(result, value, max_shift, min_bit) REVERSE_BIT_LEFT_SHIFT8(result, value, max_shift, min_bit) \
-																													  REVERSE_BIT_LEFT_SHIFT8(result, value, (max_shift + 16), (min_bit * 16))
 unsigned char reverseBit8u(unsigned char value) {
 	unsigned char result = 0;
-	//REVERSE_BIT_RIGHT_SHIFT4(result, value, 7, 1);
-	//REVERSE_BIT_LEFT_SHIFT4(result, value, 1, 16);
-	result |= BIT_REVERSE(value, 0);
-	printfBit8u(value);
-	printfBit8u(result);
-
-	result |= BIT_REVERSE(value, 1);
-	printfBit8u(result);
-	result |= BIT_REVERSE(value, 2);
-	result |= BIT_REVERSE(value, 3);
 	//result |= (value >> 7) & 1;
 	//result |= (value >> 5) & 2;
 	//result |= (value >> 3) & 4;
@@ -40,16 +9,18 @@ unsigned char reverseBit8u(unsigned char value) {
 	//result |= (value << 3) & 32;
 	//result |= (value << 5) & 64;
 	//result |= (value << 7) & 128;
+	for (unsigned int i = 0; i < 4; i++) {
+		result |= (value >> (7 - (2 * i)))& (1 << i);
+		result |= (value << ((2 * i) + 1)) & (16 << i);
+	}
 	return result;
 }
 unsigned int reverseBit32u(unsigned int value) {
 	unsigned int result = 0;
-	REVERSE_BIT_RIGHT_SHIFT16(result, value, 31, 1);
-	REVERSE_BIT_LEFT_SHIFT16(result, value, 1, 32768);
-	//for (unsigned int i = 0; i < 16; i++) {
-	//	result |= (value >> (31 - (2 * i)))& (2 * (i + 1));
-	//	result |= (value << ((2 * i) + 1)) & (32768 * (i + 1));
-	//}
+	for (unsigned int i = 0; i < 16; i++) {
+		result |= (value >> (31 - (2 * i)))& (1 << i);
+		result |= (value << ((2 * i) + 1)) & (65536 << i);
+	}
 	return result;
 }
 

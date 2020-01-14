@@ -1,13 +1,33 @@
 #include "CRC32.h"
-
+uint64_t getBit(uint64_t value, uint8_t shift) {
+	uint64_t tmp = 1ull << shift;
+	return value & tmp;
+}
+void setBit(uint64_t* value, uint8_t shift) {
+	uint64_t tmp = 1ull << shift;
+	*value &= ~tmp;
+	*value ^= tmp;
+}
 unsigned int crc32_u8(unsigned int crc, unsigned char v) {
 	uint8_t tmp_1 = reverseBit8u(v);
-	printfBit8u(tmp_1);
-	printfBit8u(v);
-	uint32_t tmp2 = reverseBit32u(crc);
-	printfBit32u(crc);
-	printfBit32u(tmp2);
-	int c = 0;
+	uint32_t tmp_2 = reverseBit32u(crc);
+	uint64_t tmp_3 = (uint64_t)tmp_1 << 32;
+	uint64_t tmp_4 = (uint64_t)tmp_2 << 8;
+	uint64_t tmp_5 = tmp_4 ^ tmp_3;
+	uint64_t tmp_6 = tmp_5;
+
+	size_t i = 0;
+	size_t j = 7;
+	do {
+		i = 0;
+		while (!getBit(tmp_6, 39 - i))
+			i++;
+		if (i > j)
+			break;
+		tmp_5 = 0x11EDC6F41 << (j - i);
+		tmp_6 = tmp_5 ^ tmp_6;
+	} while (1);
+	return reverseBit32u((uint32_t)tmp_6);
 }
 uint32_t CRC32_Hash(uint8_t* data, size_t lengthData)
 {
@@ -31,15 +51,21 @@ uint32_t CRC64_HW_Hash(uint64_t data) {
 	crc ^= 0xFFFFFFFFFFFFFFFF;
 	return crc;
 }
-
-
-size_t CRC32BirthdayParadox(size_t numberSymbols) {
+//CRC32_Hash программная реализация
+//CRC32_HW_Hash аппаратная
+size_t CRC32BirthdayParadox(size_t numberSymbols) { 
+	
 	uint64_t* data = (uint64_t*)malloc(numberSymbols * sizeof(uint64_t));
 	uint64_t* output = (uint64_t*)malloc(numberSymbols * sizeof(uint64_t));
-	uint32_t *ptrData = (uint32_t*)data;
-	uint32_t value; 
+	uint32_t* ptrData = (uint32_t*)data;
+	uint32_t value;
 
-	CRC32_Hash(data, 1);
+	//for (uint8_t i = 0; i < 255; i++){
+	//	uint32_t value1 = CRC32_Hash(&i, 1);
+	//	uint32_t value0 = CRC32_HW_Hash(&i, 1);
+	//	if (value0 != value1)
+	//		printf("error");
+	//}
 
 	for (size_t i = 0; i < numberSymbols; i++) {
 		_rdrand64_step(&data[i]);
@@ -71,7 +97,7 @@ size_t CRC32BirthdayParadox(size_t numberSymbols) {
 void createHistogramCRC32BirthdayParadox(size_t numberValues, size_t stepNumberSymbols, size_t numberIterations, size_t maximumHistSymbols) {
 	size_t* hist = (size_t*)calloc(numberValues, sizeof(size_t));
 	ptrdiff_t i = 0;
-//#pragma omp parallel for
+	//#pragma omp parallel for
 	for (i = 0; i < numberValues; i++) {
 		for (size_t j = 0; j < numberIterations; j++) {
 			hist[i] += CRC32BirthdayParadox(i * stepNumberSymbols);
@@ -83,12 +109,12 @@ void createHistogramCRC32BirthdayParadox(size_t numberValues, size_t stepNumberS
 			max = hist[i];
 	}
 	if (max)
-	for (size_t i = 0; i < numberValues; i++) {
-		printf("\n");
-		printf("%zd :", hist[i]);
-		size_t size = maximumHistSymbols * ((double)hist[i] / max);
-		for (size_t j = 0; j < size; j++)
-			printf("#");
-	}
+		for (size_t i = 0; i < numberValues; i++) {
+			printf("\n");
+			printf("%zd :", hist[i]);
+			size_t size = maximumHistSymbols * ((double)hist[i] / max);
+			for (size_t j = 0; j < size; j++)
+				printf("#");
+		}
 	if (hist)free(hist);
 }

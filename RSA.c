@@ -1,17 +1,18 @@
-
 #include <stdlib.h>
 #include <memory.h>
 #include <math.h>
+#include <time.h>
 #include "RSA.h"
-uint32_t simpleNumber(uint64_t number) {
-	if (number == 0)
+uint32_t primeNumber(uint64_t number) {
+	if (number < 2)
 		return 0;
-	for (uint64_t i = 2; i < number; i++)
-	{
-		if (number % i == 0) {
+	const uint64_t end = sqrt(number);
+	;
+
+	for (uint64_t i = 2; i <= end; i++) 
+		if (number % i == 0)
 			return 0;
-		}
-	}
+
 	return 1;
 }
 uint64_t EulerFunction(uint64_t x0, uint64_t x1) {
@@ -50,87 +51,108 @@ int64_t invModule(int64_t a, int64_t m) {
 }
 
 void genKeys(struct RSA_data* data) {
-	srand(0);
-	while (!simpleNumber(data->publicKey)) {
+	srand(time(0));
+	while (!primeNumber(data->publicKey)) {
 		data->publicKey = 0;
 		data->publicKey |= (uint64_t)rand();
 		data->publicKey |= (uint64_t)rand() << 16;
 		data->publicKey |= (uint64_t)rand() << 32;
 		data->publicKey |= (uint64_t)rand() << 48;
 
-		data->publicKey %= 2048;///////////////////////
-		//data->publicKey = UINT64_MAX * (float)rand() / RAND_MAX;
+		//data->publicKey %= 2048;///////////////////////
 	}
-	while (!simpleNumber(data->secretKey)) {
+	while (!primeNumber(data->secretKey)) {
 		data->secretKey = 0;
 		data->secretKey |= (uint64_t)rand();
 		data->secretKey |= (uint64_t)rand() << 16;
 		data->secretKey |= (uint64_t)rand() << 32;
 		data->secretKey |= (uint64_t)rand() << 48;
 
-		data->secretKey %= 2048;///////////////////////////
+		//data->secretKey %= 2048;///////////////////////////
 	}
-	//data->publicKey = 3557;
-	//data->secretKey = 2579;
 
 	data->n = data->secretKey * data->publicKey;
 	uint64_t e_number = EulerFunction(data->publicKey, data->secretKey);
 	uint64_t exp = 4;
-	while (!simpleNumber(exp)) {
+	while (!primeNumber(exp)) {
 		exp = 0;
 		exp |= (uint64_t)rand();
 		exp |= (uint64_t)rand() << 16;
 		exp |= (uint64_t)rand() << 32;
 		exp |= (uint64_t)rand() << 48;
 
-		exp %= 128; /////////////////////////////
+		//exp %= 128; /////////////////////////////
 	}
-	//exp = 3;
-	//uint64_t value = EuclideanAlgorithm(exp, e_number);   
+	//uint64_t value = EuclideanAlgorithm(exp, e_number);
 	uint64_t secret_exp = invModule(exp, e_number);
-	//uint64_t secret_exp = (uint64_t)(1.0 / exp) % e_number;
 	data->publicKey = exp;
 	data->secretKey = secret_exp;
 }
 
-uint8_t* cryptRSA(uint8_t* text, size_t lengthText, struct RSA_data* data) {
-	uint8_t* text_cipher = (uint8_t*)malloc(lengthText);
-	uint64_t cipher = 0;
-	for (size_t i = 0; i < lengthText; i++) {
-		cipher |= (uint64_t)text[i] << i * 8;
-	}
-	struct BigInteger cipherBigInteger = initBigInteger64U(cipher);
-	struct BigInteger publicKeyBigInteger = initBigInteger64U(data->publicKey);
-	struct BigInteger cipherValue = powBigInteger(&cipherBigInteger, &publicKeyBigInteger);
-	freeBigInteger(&cipherBigInteger);
-	freeBigInteger(&publicKeyBigInteger);
+struct BigInteger cryptRSA(uint8_t* text, size_t lengthText, struct RSA_data* data) {
+	struct BigInteger remainderCipherValue = { 0 };
+	uint8_t* numberText = (uint8_t*)malloc(3 * lengthText);
+	if (numberText) {
+		size_t j = 0;
+		for (size_t i = 0; i < lengthText; i++) {
+			uint8_t value_0 = (text[i] / 100) % 10;
+			uint8_t value_1 = (text[i] / 10) % 10;
+			uint8_t value_2 = (text[i] / 1) % 10;
+			if (value_0 != 0) {
+				numberText[j++] = value_0 + '0';
+				numberText[j++] = value_1 + '0';
+			}
+			else if (value_1 != 0) {
+				numberText[j++] = value_1 + '0';
+			}
+			numberText[j++] = value_2 + '0';
+		}
 
-	cipher = ((uint64_t)pow(cipher, data->publicKey)) % data->n;
-	for (size_t i = 0; i < lengthText; i++) {
-		text_cipher[i] = (cipher >> i * 8) & 255;
+		struct BigInteger cipherBigInteger = initBigInteger8U(numberText, j);
+		struct BigInteger nBigInteger = initBigInteger64U(data->n);
+		struct BigInteger publicKeyBigInteger = initBigInteger64U(data->publicKey);
+		//struct BigInteger cipherValue_0 = powBigInteger(&cipherBigInteger, &publicKeyBigInteger);
+		struct BigInteger cipherValue = fastPowBigInteger(&cipherBigInteger, &publicKeyBigInteger);
+
+		struct BigInteger result = divideBigIntegerPPP(&cipherValue, &nBigInteger, &remainderCipherValue);
+
+		freeBigInteger(&cipherBigInteger);
+		freeBigInteger(&nBigInteger);
+		freeBigInteger(&publicKeyBigInteger);
+		freeBigInteger(&cipherValue);
+		freeBigInteger(&result);
+		free(numberText);
+		return remainderCipherValue;
 	}
-	return text_cipher;
+	return remainderCipherValue;
 }
-uint8_t* decryptRSA(uint8_t* cipher, size_t lengthText, struct RSA_data* data) {
-	uint8_t* text_decrypt = (uint8_t*)malloc(lengthText);
-	uint64_t text = 0;
-	for (size_t i = 0; i < lengthText; i++) {
-		text |= (uint64_t)cipher[i] << i * 8;
-	}
-	//double value = pow(text, data->secretKey);  //ERROR INF
-	text = ((uint64_t)pow(text, data->secretKey)) % data->n;
-	for (size_t i = 0; i < lengthText; i++) {
-		text_decrypt[i] = (text >> i * 8) & 255;
-	}
-	return text_decrypt;
+uint8_t* decryptRSA(struct BigInteger* cipher, struct RSA_data* data) {
+	struct BigInteger decryptBigInteger = initBigInteger(cipher);
+	struct BigInteger secretKeyBigInteger = initBigInteger64U(data->secretKey);
+	struct BigInteger nBigInteger = initBigInteger64U(data->n);
+	struct BigInteger remainderCipherValue = { 0 };
+	struct BigInteger cipherValue = fastPowBigInteger(&decryptBigInteger, &secretKeyBigInteger);
+	struct BigInteger result = divideBigIntegerPPP(&cipherValue, &nBigInteger, &remainderCipherValue);
+	freeBigInteger(&decryptBigInteger);
+	freeBigInteger(&secretKeyBigInteger);
+	freeBigInteger(&nBigInteger);
+	freeBigInteger(&cipherValue);
+	freeBigInteger(&result);
+	return remainderCipherValue.value;
 }
 
-void testRSA() {
+void testRSA() { 
 	struct RSA_data data;
-	genKeys(&data);
-	uint8_t text[] = { "ok!" };
-	uint8_t* cryptData = cryptRSA(text, sizeof(text), &data);
-	uint8_t* decryptData = decryptRSA(cryptData, sizeof(text), &data);
-	if (cryptData) free(cryptData);
+	//genKeys(&data);
+	data.n = 9173503; //test https://ru.wikipedia.org/wiki/RSA
+	data.publicKey = 3;
+	data.secretKey = 6111579;
+	uint8_t text[] = { 1,1,1,1,1,1,0 };
+	struct BigInteger cryptData = cryptRSA(text, sizeof(text) - 1, &data);
+	uint8_t* decryptData = decryptRSA(&cryptData, &data);
+	printf("text : %s\n", text);
+	printf("crypt : %s\n", cryptData);
+	printf("decrypt : %s\n", decryptData);
+	freeBigInteger(&cryptData);
 	if (decryptData) free(decryptData);
 }

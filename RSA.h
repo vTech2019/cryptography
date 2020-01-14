@@ -9,8 +9,8 @@ struct RSA_data {
 #define __RSA__
 
 void genKeys(struct RSA_data* data);
-uint8_t* decryptRSA(uint8_t* cipher, size_t lengthText, struct RSA_data* data);
-uint8_t* cryptRSA(uint8_t* text, size_t lengthText, struct RSA_data* data);
+uint8_t* decryptRSA(struct BigInteger* cipher, struct RSA_data* data);
+struct BigInteger cryptRSA(uint8_t* text, size_t lengthText, struct RSA_data* data);
 
 void testRSA();
 #endif
